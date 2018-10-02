@@ -1,7 +1,7 @@
 """
 Networks and Network Security
 Lab 6 - Distributed Sensor Network
-NAME: Jasper Koppen
+NAME: Jasper Koppen & Danny Opdam
 STUDENT ID: 11302445
 
 DESCRIPTION:
