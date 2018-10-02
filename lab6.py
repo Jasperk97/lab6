@@ -59,8 +59,11 @@ def main(mcast_addr, sensor_pos, sensor_strength, sensor_decay,
     window = MainWindow()
     window.writeln('my address is %s:%s' % peer.getsockname())
     window.writeln('my position is (%s, %s)' % sensor_pos)
-
-    # This is the event loop.
+    window.writeln('my strength is %s' % sensor_strength)
+    window.writeln('my decay is %s' % sensor_decay)
+    """
+    Hier moeten wij gaan programmeren.
+    """
     while window.update():
         pass
 
