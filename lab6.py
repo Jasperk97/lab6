@@ -32,19 +32,6 @@ def main(mcast_addr, sensor_pos, sensor_strength, sensor_decay,
     ping_period: time in seconds between multicast pings.
     """
 
-    # Create the multicast listener socket.
-    mcast = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-    # Sets the socket address as reusable so you can run multiple instances
-    # of the program on the same machine at the same time.
-    mcast.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-    # Subscribe the socket to multicast messages from the given address.
-    mreq = struct.pack('4sl', inet_aton(mcast_addr[0]), INADDR_ANY)
-    mcast.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq)
-    if sys.platform == 'win32':  # windows special case
-        mcast.bind(('localhost', mcast_addr[1]))
-    else:  # should work for everything else
-        mcast.bind(mcast_addr)
-
     # Create the peer-to-peer socket.
     peer = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
     # Set the socket multicast TTL so it can send multicast messages.
@@ -55,16 +42,47 @@ def main(mcast_addr, sensor_pos, sensor_strength, sensor_decay,
     else:  # should work for everything else
         peer.bind(('', INADDR_ANY))
 
+    # Create the multicast listener socket.
+    mcast = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+    # Sets the socket address as reusable so you can run multiple instances
+    # of the program on the same machine at the same time.
+    mcast.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+    if sys.platform == 'win32':  # windows special case
+        mcast.bind(('localhost', mcast_addr[1]))
+    else:  # should work for everything else
+        mcast.bind(mcast_addr)
+
+    # Subscribe the socket to multicast messages from the given address.
+    # mreq = struct.pack('4sl', inet_aton(mcast_addr[0]), INADDR_ANY)
+    print(mcast_addr)
+    mreq = struct.pack('4sl', inet_aton(mcast_addr[0]), INADDR_ANY)
+    mcast.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq)
+
+
+    # sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+
+
     # make the gui.
-    window = MainWindow()
-    window.writeln('my address is %s:%s' % peer.getsockname())
-    window.writeln('my position is (%s, %s)' % sensor_pos)
-    window.writeln('my strength is %s' % sensor_strength)
-    window.writeln('my decay is %s' % sensor_decay)
+    w= MainWindow()
+    w.writeln('my address is %s:%s' % peer.getsockname())
+    w.writeln('my position is (%s, %s)' % sensor_pos)
+    w.writeln('my strength is %s' % sensor_strength)
+    w.writeln('my decay is %s' % sensor_decay)
+
     """
     Hier moeten wij gaan programmeren.
     """
-    while window.update():
+    # # print(peer.sendto(bytes("Hello World", "utf-8"), ('127.0.0.1', 10000)))
+    peer.sendto(bytes("Hello World", "utf-8"), (mcast_addr[0], 50000))
+    while w.update():
+        mcast.setblocking(0)
+
+        ready = select.select([mcast], [], [], 1)
+        if ready[0]:
+            data = mcast.recv(4096)
+            data = data.decode()
+            w.writeln(data)
+
         pass
 
 
@@ -72,6 +90,7 @@ def main(mcast_addr, sensor_pos, sensor_strength, sensor_decay,
 if __name__ == '__main__':
     import sys
     import argparse
+    import select
     p = argparse.ArgumentParser()
     p.add_argument('--group', help='multicast group', default='224.1.1.1')
     p.add_argument('--port', help='multicast port', default=50000, type=int)
