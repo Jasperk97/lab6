@@ -2,7 +2,7 @@
 Networks and Network Security
 Lab 6 - Distributed Sensor Network
 NAME: Jasper Koppen & Danny Opdam
-STUDENT ID: 11302445
+STUDENT ID: 11302445, 10786708
 
 DESCRIPTION:
 
@@ -22,40 +22,99 @@ def random_position(n):
     return (x, y)
 
 
-def parse(peer, mcast, w, mcast_addr, sensor_pos, sensor_strength, sensor_decay,
-         grid_size, ping_period):
-    input = w.getline()
-    mcast.setblocking(0)
-    if (input == "ping"):
-        ping(mcast, peer, sensor_pos, sensor_decay, sensor_strength)
 
-    ready = select.select([mcast], [], [], 1)
+def eventLoop(mcast, peer, window, sensor_pos, mcast_addr):
+    queue = []
+    neighbours = []
+    input = [mcast, peer]
+    output = [peer]
+    sequence = 0
+    res = ""
+
+    # mcast.setblocking(0)
+    peer.sendto(bytes("welcome", "utf-8"), (mcast_addr[0], 50000))
+
+
+    line = window.getline()
+    if line:
+        print(line)
+        res = handle_command(line, mcast, peer, window, sensor_pos, mcast_addr)
+        print(res)
+
+
+    ready = select.select(input, output, input, 1)
+    # ready = select.select([mcast], [], [], 1)
+
+
+    # print(readable)
+
+    # print(readable)
+    # print(writable)
+    print(ready[0])
+    print(ready[1])
+    print(ready[2])
     if ready[0]:
-        data = mcast.recv(4096)
-        data = data.decode()
-        w.writeln(data)
+        if res == MSG_PING:
+            ping(mcast, peer, sensor_pos, sensor_decay, sensor_strength)
 
 
-def get_distance(x, y):
-    print("nog niks ermee gedaan")
+        print(mcast.recvfrom(1024))
+        data, addr = mcast.recvfrom(1024)
+        print(data)
+        print(addr)
+        mcast.setblocking(0)
 
-# v-d^(x)
+    # if data == '':
+
+    # message = message_decode(1024)
+    # type = message[0]
+    # resv_pos = message[3]
+    # ping(data, addr)
+    # if sensor_pos == resv_pos:
+    #     continue
+    #
+    # if type == MSG_PING:
+    #     ping(data, addr)
+    # elif type == MSG_PONG:
+    #     recvpong(data, addr)
+    # elif type == MSG_ECHO:
+    #     echo(data, addr)
+    # elif type == MSG_ECHO_REPLY:
+    #     echoreply(data, addr)
+
+    # for write in writable:
+    #     for msg in queue:
+    #         write.sendto(msg, mcast_addr)
+    #     queue = []
+
+
+
+def handle_command(line, mcast, peer, window, sensor_pos, mcast_addr):
+    """
+    Parse and handle commands
+    """
+    line = line.strip()
+    mes_type = ""
+    # window.writeln(line)
+    if line == 'ping':
+        mes_type = MSG_PING
+    elif line == 'list':
+        list()
+    elif line == 'move':
+        move()
+    elif line.startswith('decay'):
+        decay(line)
+    elif line.startswith('strength'):
+        strength(line)
+    elif line == 'echo':
+        echo_init()
+
+    return mes_type
+
+
 def ping(mcast, peer, pos, decay, strength):
-    """
-    v = strength
-    x = decay
-    d = distance a tot b
-    """
-    # peer.sendto(bytes("Hello World", "utf-8"), ('127.0.0.1', 50000))
-    # peer.sendto(bytes("Hello World", "utf-8"), ('', 50000))
-    message = "Ping sent!!!!!\n"
-    message += "   From position: " + str(pos) + "\n"
-    message += "               x: " + str(pos[0]) + "\n"
-    message += "               y: " + str(pos[1]) + "\n"
-    message += "   Decay        : " + str(decay) + "\n"
-    message += "   Strength     : " + str(strength) + "\n"
-    peer.sendto(bytes(message, "utf-8"), (mcast_addr[0], 50000))
-
+    print("PING SEND")
+    peer.sendto(bytes("test", "utf-8"), (mcast_addr[0], 50000))
 
 
 def main(mcast_addr, sensor_pos, sensor_strength, sensor_decay,
@@ -68,6 +127,19 @@ def main(mcast_addr, sensor_pos, sensor_strength, sensor_decay,
     ping_period: time in seconds between multicast pings.
     """
 
+    # Create the multicast listener socket.
+    mcast = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+    # Sets the socket address as reusable so you can run multiple instances
+    # of the program on the same machine at the same time.
+    mcast.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+    # Subscribe the socket to multicast messages from the given address.
+    mreq = struct.pack('4sl', inet_aton(mcast_addr[0]), INADDR_ANY)
+    mcast.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq)
+    if sys.platform == 'win32':  # windows special case
+        mcast.bind(('localhost', mcast_addr[1]))
+    else:  # should work for everything else
+        mcast.bind(mcast_addr)
+
     # Create the peer-to-peer socket.
     peer = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
     # Set the socket multicast TTL so it can send multicast messages.
@@ -78,43 +150,22 @@ def main(mcast_addr, sensor_pos, sensor_strength, sensor_decay,
     else:  # should work for everything else
         peer.bind(('', INADDR_ANY))
 
-    # Create the multicast listener socket.
-    mcast = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-    # Sets the socket address as reusable so you can run multiple instances
-    # of the program on the same machine at the same time.
-    mcast.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-    if sys.platform == 'win32':  # windows special case
-        mcast.bind(('localhost', mcast_addr[1]))
-    else:  # should work for everything else
-        mcast.bind(mcast_addr)
-
-    # Subscribe the socket to multicast messages from the given address.
-    # mreq = struct.pack('4sl', inet_aton(mcast_addr[0]), INADDR_ANY)
-    print(mcast_addr)
-    mreq = struct.pack('4sl', inet_aton(mcast_addr[0]), INADDR_ANY)
-    mcast.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq)
-
-
-    # sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
-
     # make the gui.
-    w= MainWindow()
-    w.writeln('my address is %s:%s' % peer.getsockname())
-    w.writeln('my position is (%s, %s)' % sensor_pos)
-    w.writeln('my strength is %s' % sensor_strength)
-    w.writeln('my decay is %s' % sensor_decay)
-
+    window = MainWindow()
+    window.writeln('my address is %s:%s' % peer.getsockname())
+    window.writeln('my position is (%s, %s)' % sensor_pos)
+    window.writeln('my strength is %s' % sensor_strength)
+    window.writeln('my decay is %s' % sensor_decay)
     """
     Hier moeten wij gaan programmeren.
     """
-    # # print(peer.sendto(bytes("Hello World", "utf-8"), ('127.0.0.1', 10000)))
+    variables = [mcast_addr, sensor_pos, sensor_strength, sensor_decay, grid_size, ping_period]
 
-    while w.update():
-        parse(peer, mcast, w, mcast_addr, sensor_pos, sensor_strength, sensor_decay,
-                 grid_size, ping_period)
+    print(peer.getsockname())
+    while window.update():
+        eventLoop(mcast, peer, window, sensor_pos, mcast_addr)
 
-        pass
+
 
 
 # program entry point.
@@ -130,7 +181,7 @@ if __name__ == '__main__':
     p.add_argument('--strength', help='sensor strength', default=50, type=int)
     p.add_argument('--decay', help='decay rate', default=1, type=int)
     p.add_argument('--period', help='period between autopings (0=off)',
-                   default=10, type=int)
+                   default=5, type=int)
     args = p.parse_args(sys.argv[1:])
     if args.pos:
         pos = tuple(int(n) for n in args.pos.split(',')[:2])
